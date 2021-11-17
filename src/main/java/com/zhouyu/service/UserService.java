@@ -1,26 +1,32 @@
 package com.zhouyu.service;
 
 
-import com.spring.Autowired;
-import com.spring.BeanNameAware;
-import com.spring.Component;
-import com.spring.Scope;
+import com.spring.*;
 
 @Component("userService")
 //@Scope("prototype")
-public class UserService implements BeanNameAware {
+public class UserService implements InitializingBean {
 
     @Autowired
     private OrderService orderService;
-    private String beanName;
 
-    @Override
-    public void setBeanName(String name) {
-        beanName = name;
-    }
+    private String name;
+
+//    @Override
+//    public void setBeanName(String name) {
+//        beanName = name;
+//    }
     public void test(){
         System.out.println(orderService);
-        System.out.println(beanName);
+        System.out.println(name);
     }
 
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        System.out.println("初始化");
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
 }

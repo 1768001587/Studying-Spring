@@ -4,14 +4,19 @@ import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ZhouyuApplicationContext {
 
     private  Class configClass;
-    private ConcurrentHashMap<String,Object> singletonObjects = new ConcurrentHashMap<>();//单例池
+    //单例池
+    private ConcurrentHashMap<String,Object> singletonObjects = new ConcurrentHashMap<>();
     private ConcurrentHashMap<String,BeanDefinition> beanDefinitionMap = new ConcurrentHashMap<>();
+    private List<BeanPostProcessor> beanPostProcessorList = new ArrayList<>();
+
 
     public ZhouyuApplicationContext(Class configClass) {
         this.configClass = configClass;
@@ -22,7 +27,8 @@ public class ZhouyuApplicationContext {
             String beanName = entry.getKey();
             BeanDefinition beanDefinition = entry.getValue();
             if(beanDefinition.getScope().equals("singleton")){
-                Object bean = createBean(beanName,beanDefinition);//单例bean对象
+                //单例bean对象
+                Object bean = createBean(beanName,beanDefinition);
                 singletonObjects.put(beanName,bean);
             }
         }
@@ -42,10 +48,30 @@ public class ZhouyuApplicationContext {
                     declaredField.set(instance,bean);
                 }
             }
+            //Aware回调
             //是否实现了BeanNameAware,实例化一个对象，给这个对象里面的属性赋值
             if(instance instanceof BeanNameAware){
                 ((BeanNameAware)instance).setBeanName(beanName);
             }
+            for (BeanPostProcessor beanPostProcessor:beanPostProcessorList) {
+                //对instance进行额外加工，因此前后可能不是同一个对象
+                instance = beanPostProcessor.postProcessBeforeInitialization(instance,beanName);
+            }
+
+            //初始化
+            if(instance instanceof InitializingBean){
+                try {
+                    ((InitializingBean)instance).afterPropertiesSet();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+            //BeanPostProcessor扩展机制
+            for (BeanPostProcessor beanPostProcessor:beanPostProcessorList) {
+                //对instance进行额外加工，因此前后可能不是同一个对象
+                instance = beanPostProcessor.postProcessAfterInitialization(instance,beanName);
+            }
+
             return instance;
         } catch (InstantiationException e) {
             e.printStackTrace();
@@ -95,6 +121,12 @@ public class ZhouyuApplicationContext {
                         if(clazz.isAnnotationPresent(Component.class)){
                             //表示这个类是一个Bean
                             //解析类，判断当前bean是单例bean，还是prototype的bean
+                            //发现是一个BeanPostProcessor，clazz对象实现了BeanPostProcessor这个接口
+                            if(BeanPostProcessor.class.isAssignableFrom(clazz)){
+                                BeanPostProcessor instance = (BeanPostProcessor)clazz.getDeclaredConstructor().newInstance();
+                                beanPostProcessorList.add(instance);
+                            }
+
                             //解析类-》BeanDefinition，对bean进行解析
                             Component componentAnnotation = clazz.getAnnotation(Component.class);
                             String beanName = componentAnnotation.value();
@@ -108,7 +140,7 @@ public class ZhouyuApplicationContext {
                             }
                             beanDefinitionMap.put(beanName,beanDefinition);
                         }
-                    } catch (ClassNotFoundException e) {
+                    } catch (ClassNotFoundException | NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e) {
                         e.printStackTrace();
                     }
                 }
