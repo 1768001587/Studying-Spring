@@ -58,7 +58,7 @@ public class ZhouyuApplicationContext {
                 instance = beanPostProcessor.postProcessBeforeInitialization(instance,beanName);
             }
 
-            //初始化
+            //初始化，有没有实现InitializingBean接口
             if(instance instanceof InitializingBean){
                 try {
                     ((InitializingBean)instance).afterPropertiesSet();
@@ -66,20 +66,13 @@ public class ZhouyuApplicationContext {
                     e.printStackTrace();
                 }
             }
-            //BeanPostProcessor扩展机制
+            //BeanPostProcessor扩展机制，AOP的实现
             for (BeanPostProcessor beanPostProcessor:beanPostProcessorList) {
                 //对instance进行额外加工，因此前后可能不是同一个对象
                 instance = beanPostProcessor.postProcessAfterInitialization(instance,beanName);
             }
-
             return instance;
-        } catch (InstantiationException e) {
-            e.printStackTrace();
-        } catch (IllegalAccessException e) {
-            e.printStackTrace();
-        } catch (InvocationTargetException e) {
-            e.printStackTrace();
-        } catch (NoSuchMethodException e) {
+        } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
             e.printStackTrace();
         }
         return null;
